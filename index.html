@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Доска объявлений — Главная</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>Доска объявлений</h1>
+        <p>Находите нужные вещи и предлагайте свои услуги</p>
+    </header>
+
+    <!-- Панель профиля (появляется после входа) -->
+    <section id="user-profile" class="user-bar hidden">
+        <div>
+            Вы вошли как: <strong id="profile-name"></strong> (<span id="profile-phone"></span>)
+        </div>
+        <button type="button" id="logout-btn" class="btn-secondary">Выйти</button>
+    </section>
+
+    <!-- Блок регистрации и входа по СМС -->
+    <section id="auth-section">
+        <h2>Быстрая регистрация и вход</h2>
+        <form id="auth-form">
+            <label for="user-name">Ваше имя:</label>
+            <input type="text" id="user-name" name="name" placeholder="Например, Алексей" required>
+
+            <label for="user-phone">Номер телефона:</label>
+            <input type="tel" id="user-phone" name="phone" placeholder="+7 (999) 000-00-00" required>
+
+            <!-- Скрытый блок подтверждения СМС -->
+            <div id="sms-step" class="hidden">
+                <label for="sms-code">Код из СМС (введите любые 4 цифры):</label>
+                <input type="text" id="sms-code" maxlength="4" placeholder="1234">
+            </div>
+
+            <button type="submit" id="auth-submit-btn">Получить код по СМС</button>
+        </form>
+    </section>
+
+    <!-- Форма добавления объявления -->
+    <section>
+        <h2>Разместить новое объявление</h2>
+        <form id="ad-form">
+            <label for="ad-author">Имя автора:</label>
+            <input type="text" id="ad-author" name="author" placeholder="Как к вам обращаться?" required>
+
+            <label for="ad-title">Заголовок объявления:</label>
+            <input type="text" id="ad-title" name="title" placeholder="Что вы предлагаете?" required>
+
+            <label for="ad-text">Текст объявления:</label>
+            <textarea id="ad-text" name="text" rows="4" placeholder="Опишите детали, состояние или условия..." required></textarea>
+
+            <p><strong>Условия (можно выбрать оба варианта):</strong></p>
+            <label>
+                <input type="checkbox" id="is-paid" name="paid" value="yes"> 💰 Платно
+            </label>
+            <br><br>
+            <label>
+                <input type="checkbox" id="is-free" name="free" value="yes"> 🆓 Бесплатно
+            </label>
+            <br><br>
+
+            <button type="submit">Опубликовать объявление</button>
+        </form>
+    </section>
+
+    <!-- Лента объявлений -->
+    <main>
+        <h2>Свежие объявления</h2>
+
+        <!-- Поле живого поиска -->
+        <input type="search" id="search-input" placeholder="🔍 Поиск по заголовку, тексту или автору...">
+
+        <!-- Кнопки фильтрации -->
+        <div class="filters">
+            <button type="button" class="filter-btn active" data-filter="all">Все объявления</button>
+            <button type="button" class="filter-btn" data-filter="paid">💰 Только платные</button>
+            <button type="button" class="filter-btn" data-filter="free">🆓 Только бесплатные</button>
+        </div>
+        
+        <!-- Контейнер для карточек -->
+        <div id="ads-list"></div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Мой сайт объявлений. Все права защищены.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
