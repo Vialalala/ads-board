@@ -1,5 +1,5 @@
 // ПОДКЛЮЧЕНИЕ К ВАШЕЙ ОБЛАЧНОЙ БАЗЕ ДАННЫХ SUPABASE:
-const SUPABASE_URL = 'https://geahyanxykxrgdnhyxwr.supabase.co';
+const SUPABASE_URL = 'https://supabase.co';
 const SUPABASE_KEY = 'sb_publishable_pUeM-H4q3txd1tEtMvgwqg_jGqwxaLy';
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -30,248 +30,247 @@ const myCityBtn = document.getElementById('my-city-btn');
 // 1. НАВИГАЦИЯ И ОТРИСОВКА 5 ЗВЁЗД РЕЙТИНГА
 // ==========================================
 function showView(viewId) {
-    document.querySelectorAll('.view-screen').forEach(el => el.classList.add('hidden'));
-    document.getElementById(viewId).classList.remove('hidden');
-    window.scrollTo(0, 0);
+    document.querySelectorAll('.view-screen').forEach(el => el.classList.add('hidden'));
+    const target = document.getElementById(viewId);
+    if (target) target.classList.remove('hidden');
+    window.scrollTo(0, 0);
 }
 
 function openFeed() {
-    showView('view-feed');
-    loadAds();
+    showView('view-feed');
+    loadAds();
 }
 
 function renderStarsHTML(rating, votesCount = null) {
-    const score = Number(rating) || 0;
-    const filledCount = Math.round(score);
-    
-    let stars = '<span class="stars-row">';
-    for (let i = 1; i <= 5; i++) {
-        const isFilled = i <= filledCount ? 'filled' : '';
-        stars += `<span class="star-icon ${isFilled}">★</span>`;
-    }
-    
-    if (score > 0) {
-        const votesText = votesCount !== null ? `, голосов: ${votesCount}` : '';
-        stars += `<span class="rating-score-text">${score.toFixed(1)}${votesText}</span>`;
-    } else {
-        stars += `<span class="rating-score-text">нет оценок</span>`;
-    }
-    stars += '</span>';
-    return stars;
+    const score = Number(rating) || 0;
+    const filledCount = Math.round(score);
+    
+    let stars = '<span class="stars-row">';
+    for (let i = 1; i <= 5; i++) {
+        const isFilled = i <= filledCount ? 'filled' : '';
+        stars += `<span class="star-icon ${isFilled}">★</span>`;
+    }
+    
+    if (score > 0) {
+        const votesText = votesCount !== null ? `, голосов: ${votesCount}` : '';
+        stars += `<span class="rating-score-text">${score.toFixed(1)}${votesText}</span>`;
+    } else {
+        stars += `<span class="rating-score-text">нет оценок</span>`;
+    }
+    stars += '</span>';
+    return stars;
 }
 
 // ==========================================
 // 2. АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ
 // ==========================================
 db.auth.onAuthStateChange(async (event, session) => {
-    if (session && session.user) {
-        currentUser = session.user;
-        await loadOrCreateMyProfile(currentUser);
-        updateNavbarProfile();
-        openFeed();
-    } else {
-        currentUser = null;
-        myProfile = null;
-        showView('view-landing');
-    }
+    if (session && session.user) {
+        currentUser = session.user;
+        await loadOrCreateMyProfile(currentUser);
+        updateNavbarProfile();
+        openFeed();
+    } else {
+        currentUser = null;
+        myProfile = null;
+        showView('view-landing');
+    }
 });
 
 async function loadOrCreateMyProfile(user) {
-    const { data } = await db.from('profiles').select('*').eq('email', user.email).single();
-    if (data) {
-        myProfile = data;
-    } else {
-        const meta = user.user_metadata || {};
-        const newProfile = {
-            email: user.email,
-            username: meta.username || user.email.split('@')[0],
-            name: meta.name || 'Родитель',
-            location: meta.location || 'Россия',
-            bio: '',
-            telegram: '',
-            whatsapp: '',
-            avatar: '',
-            rating: 0,
-            ratings_map: {}
-        };
-        await db.from('profiles').insert([newProfile]);
-        myProfile = newProfile;
-    }
+    const { data } = await db.from('profiles').select('*').eq('email', user.email).single();
+    if (data) {
+        myProfile = data;
+    } else {
+        const meta = user.user_metadata || {};
+        const newProfile = {
+            email: user.email,
+            username: meta.username || user.email.split('@'),
+            name: meta.name || 'Родитель',
+            location: meta.location || 'Россия',
+            bio: '',
+            telegram: '',
+            whatsapp: '',
+            avatar: '',
+            rating: 0,
+            ratings_map: {}
+        };
+        await db.from('profiles').insert([newProfile]);
+        myProfile = newProfile;
+    }
 }
 
 function updateNavbarProfile() {
-    if (!myProfile) return;
-    document.getElementById('nav-username').textContent = '@' + myProfile.username;
-    
-    const votesCount = Object.keys(myProfile.ratings_map || {}).length;
-    document.getElementById('nav-rating').innerHTML = renderStarsHTML(myProfile.rating, votesCount);
+    if (!myProfile) return;
+    document.getElementById('nav-username').textContent = '@' + myProfile.username;
+    
+    const votesCount = Object.keys(myProfile.ratings_map || {}).length;
+    document.getElementById('nav-rating').innerHTML = renderStarsHTML(myProfile.rating, votesCount);
 
-    const navImg = document.getElementById('nav-avatar-img');
-    const navPlace = document.getElementById('nav-avatar-placeholder');
-    if (myProfile.avatar) {
-        navImg.src = myProfile.avatar;
-        navImg.classList.remove('hidden');
-        navPlace.classList.add('hidden');
-    } else {
-        navPlace.textContent = myProfile.name.charAt(0).toUpperCase();
-        navPlace.classList.remove('hidden');
-        navImg.classList.add('hidden');
-    }
+    const navImg = document.getElementById('nav-avatar-img');
+    const navPlace = document.getElementById('nav-avatar-placeholder');
+    if (myProfile.avatar) {
+        navImg.src = myProfile.avatar;
+        navImg.classList.remove('hidden');
+        navPlace.classList.add('hidden');
+    } else {
+        navPlace.textContent = myProfile.name.charAt(0).toUpperCase();
+        navPlace.classList.remove('hidden');
+        navImg.classList.add('hidden');
+    }
 
-    document.getElementById('ad-location').value = myProfile.location || '';
-    const shortCity = (myProfile.location || '').split(',')[0];
-    myCityBtn.textContent = `📍 Мой город (${shortCity})`;
+    document.getElementById('ad-location').value = myProfile.location || '';
+    const shortCity = (myProfile.location || '').split(',').trim();
+    myCityBtn.textContent = shortCity ? `📍 Мой город (${shortCity})` : '📍 Мой населённый пункт';
 }
 
-regLocationInput.addEventListener('input', function() {
-    const query = this.value.trim();
-    clearTimeout(locationTimeout);
+if (regLocationInput) {
+    regLocationInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        clearTimeout(locationTimeout);
 
-    if (query.length < 2) {
-        locationSuggestions.classList.add('hidden');
-        return;
-    }
+        if (query.length < 2) {
+            locationSuggestions.classList.add('hidden');
+            return;
+        }
 
-    locationTimeout = setTimeout(async () => {
-        try {
-            const url = `https://openstreetmap.org{encodeURIComponent(query)}&countrycodes=ru&format=json&addressdetails=1&limit=10&accept-language=ru`;
-            const res = await fetch(url);
-            const places = await res.json();
-            locationSuggestions.innerHTML = '';
+        locationTimeout = setTimeout(async () => {
+            try {
+                const url = `https://openstreetmap.org{encodeURIComponent(query)}&countrycodes=ru&format=json&addressdetails=1&limit=10&accept-language=ru`;
+                const res = await fetch(url);
+                const places = await res.json();
+                locationSuggestions.innerHTML = '';
 
-            const settlements = places.filter(p => 
-                p.address && (p.address.city || p.address.town || p.address.village || p.address.hamlet || p.address.suburb)
-            );
+                const settlements = places.filter(p => 
+                    p.address && (p.address.city || p.address.town || p.address.village || p.address.hamlet || p.address.suburb)
+                );
 
-            if (settlements.length === 0) {
-                locationSuggestions.classList.add('hidden');
-                return;
-            }
+                if (settlements.length === 0) {
+                    locationSuggestions.classList.add('hidden');
+                    return;
+                }
 
-            const unique = new Set();
-            settlements.forEach(place => {
-                const addr = place.address;
-                const loc = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb;
-                const dist = addr.county || addr.district || '';
-                const reg = addr.state || addr.region || '';
-                const fullName = [...new Set([loc, dist, reg].filter(Boolean))].join(', ');
+                const unique = new Set();
+                settlements.forEach(place => {
+                    const addr = place.address;
+                    const loc = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb;
+                    const dist = addr.county || addr.district || '';
+                    const reg = addr.state || addr.region || '';
+                    const fullName = [...new Set([loc, dist, reg].filter(Boolean))].join(', ');
 
-                if (!unique.has(fullName)) {
-                    unique.add(fullName);
-                    const li = document.createElement('li');
-                    li.textContent = fullName;
-                    li.onclick = () => {
-                        regLocationInput.value = fullName;
-                        locationSuggestions.classList.add('hidden');
-                    };
-                    locationSuggestions.appendChild(li);
-                }
-            });
-            locationSuggestions.classList.remove('hidden');
-        } catch (err) {
-            console.error(err);
-        }
-    }, 400);
-});
+                    if (!unique.has(fullName)) {
+                        unique.add(fullName);
+                        const li = document.createElement('li');
+                        li.textContent = fullName;
+                        li.onclick = () => {
+                            regLocationInput.value = fullName;
+                            locationSuggestions.classList.add('hidden');
+                        };
+                        locationSuggestions.appendChild(li);
+                    }
+                });
+                locationSuggestions.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+            }
+        }, 400);
+    });
+}
 
 document.getElementById('register-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const username = document.getElementById('reg-username').value.trim().toLowerCase();
-    const name = document.getElementById('reg-name').value.trim();
-    const location = regLocationInput.value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
+    e.preventDefault();
+    const username = document.getElementById('reg-username').value.trim().toLowerCase();
+    const name = document.getElementById('reg-name').value.trim();
+    const location = regLocationInput.value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
 
-    const { data: existingUser } = await db.from('profiles').select('username').eq('username', username).single();
-    if (existingUser) {
-        alert('Этот логин уже занят! Пожалуйста, придумайте другой уникальный логин.');
-        return;
-    }
+    const { data: existingUser } = await db.from('profiles').select('username').eq('username', username).single();
+    if (existingUser) {
+        alert('Этот логин уже занят! Пожалуйста, придумайте другой уникальный логин.');
+        return;
+    }
 
-    const { error } = await db.auth.signUp({
-        email,
-        password,
-        options: {
-            data: { username, name, location },
-            emailRedirectTo: window.location.href
-        }
-    });
+    const { error } = await db.auth.signUp({
+        email,
+        password,
+        options: {
+            data: { username, name, location },
+            emailRedirectTo: window.location.href
+        }
+    });
 
-    if (error) {
-        alert('Ошибка регистрации: ' + error.message);
-    } else {
-        alert('Письмо со ссылкой отправлено на ' + email + '. Перейдите по ссылке в письме для подтверждения и входа!');
-        e.target.reset();
-        showView('view-login');
-    }
+    if (error) {
+        alert('Ошибка регистрации: ' + error.message);
+    } else {
+        alert('Письмо со ссылкой отправлено на ' + email + '. Перейдите по ссылке в письме для подтверждения и входа!');
+        e.target.reset();
+        showView('view-login');
+    }
 });
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    let identifier = document.getElementById('login-identifier').value.trim();
-    const password = document.getElementById('login-password').value;
+    e.preventDefault();
+    let identifier = document.getElementById('login-identifier').value.trim();
+    const password = document.getElementById('login-password').value;
 
-    if (!identifier.includes('@')) {
-        const cleanLogin = identifier.replace(/^@/, '').toLowerCase();
-        const { data: prof } = await db.from('profiles').select('email').eq('username', cleanLogin).single();
-        if (!prof) {
-            alert('Пользователь с таким логином не найден.');
-            return;
-        }
-        identifier = prof.email;
-    }
+    if (!identifier.includes('@')) {
+        const cleanLogin = identifier.replace(/^@/, '').toLowerCase();
+        const { data: prof } = await db.from('profiles').select('email').eq('username', cleanLogin).single();
+        if (!prof) {
+            alert('Пользователь с таким логином не найден.');
+            return;
+        }
+        identifier = prof.email;
+    }
 
-    const { error } = await db.auth.signInWithPassword({ email: identifier, password });
-    if (error) {
-        alert('Неверный логин/почта или пароль (либо почта ещё не подтверждена по ссылке из письма).');
-    }
+    const { error } = await db.auth.signInWithPassword({ email: identifier, password });
+    if (error) {
+        alert('Неверный логин/почта или пароль (либо почта ещё не подтверждена по ссылке из письма).');
+    }
 });
 
 document.getElementById('reset-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('reset-email').value.trim();
-    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+    e.preventDefault();
+    const email = document.getElementById('reset-email').value.trim();
+    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
 
-    if (error) {
-        alert('Ошибка: ' + error.message);
-    } else {
-        alert('Ссылка для входа в профиль и смены пароля отправлена на ' + email);
-        e.target.reset();
-    }
+    if (error) {
+        alert('Ошибка: ' + error.message);
+    } else {
+        alert('Ссылка для входа в профиль и смены пароля отправлена на ' + email);
+        e.target.reset();
+    }
 });
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
-    await db.auth.signOut();
+    await db.auth.signOut();
 });
 
 // ==========================================
 // 3. ПРОФИЛЬ, КОНТАКТЫ И ГОЛОСОВАНИЕ ЗА РЕЙТИНГ
 // ==========================================
 function openOwnProfile() {
-    if (myProfile) openUserProfile(myProfile.username);
+    if (myProfile) openUserProfile(myProfile.username);
 }
 
 async function openUserProfile(username) {
-    const cleanLogin = username.replace(/^@/, '').toLowerCase();
-    const { data: profile, error } = await db.from('profiles').select('*').eq('username', cleanLogin).single();
+    const cleanLogin = username.replace(/^@/, '').toLowerCase();
+    const { data: profile, error } = await db.from('profiles').select('*').eq('username', cleanLogin).single();
 
-    if (error || !profile) {
-        alert('Профиль участника не найден.');
-        return;
-    }
+    if (error || !profile) {
+        alert('Профиль участника не найден.');
+        return;
+    }
 
-    viewedProfile = profile;
-    const isOwn = myProfile && profile.email === myProfile.email;
+    viewedProfile = profile;
+    const isOwn = myProfile && profile.email === myProfile.email;
 
-    document.getElementById('page-name').textContent = profile.name;
-    document.getElementById('page-username').textContent = '@' + profile.username;
-    document.getElementById('page-location').textContent = '📍 ' + (profile.location || 'Населённый пункт не указан');
-    
-    const votesCount = Object.keys(profile.ratings_map || {}).length;
-
-
+    document.getElementById('page-name').textContent = profile.name;
+document.getElementById('page-username').textContent = '@' + profile.username;
+document.getElementById('page-location').textContent = '📍 ' + (profile.location || 'Населённый пункт не указан');
+const votesCount = Object.keys(profile.ratings_map || {}).length;
 document.getElementById('page-rating').innerHTML = renderStarsHTML(profile.rating, votesCount);
-// Аватарка
 const imgEl = document.getElementById('page-avatar-img');
 const placeEl = document.getElementById('page-avatar-placeholder');
 if (profile.avatar) {
@@ -283,7 +282,6 @@ placeEl.textContent = profile.name.charAt(0).toUpperCase();
 placeEl.classList.remove('hidden');
 imgEl.classList.add('hidden');
 }
-// Кнопки быстрой связи через Telegram и WhatsApp с автоподстановкой приветствия
 const contactBox = document.getElementById('contact-buttons-box');
 const tgLink = document.getElementById('tg-contact-link');
 const waLink = document.getElementById('wa-contact-link');
@@ -291,7 +289,7 @@ const defaultMsg = encodeURIComponent('Здравствуйте! Пишу вам
 let hasContacts = false;
 if (profile.telegram) {
 const cleanTg = profile.telegram.replace(/^@/, '').trim();
-tgLink.href = https://t.me{cleanTg}?text=${defaultMsg};
+tgLink.href = https://t.me{cleanTg}?text=${defaultMsg};
 tgLink.classList.remove('hidden');
 hasContacts = true;
 } else {
@@ -299,7 +297,7 @@ tgLink.classList.add('hidden');
 }
 if (profile.whatsapp) {
 const cleanWa = profile.whatsapp.replace(/\D/g, '');
-waLink.href = https://wa.me{cleanWa}?text=${defaultMsg};
+waLink.href = https://wa.me{cleanWa}?text=${defaultMsg};
 waLink.classList.remove('hidden');
 hasContacts = true;
 } else {
@@ -307,7 +305,6 @@ waLink.classList.add('hidden');
 }
 if (hasContacts) contactBox.classList.remove('hidden');
 else contactBox.classList.add('hidden');
-// Редактирование профиля или голосование за участника
 const uploadLabel = document.getElementById('avatar-upload-label');
 const bioView = document.getElementById('bio-view-mode');
 const bioForm = document.getElementById('bio-edit-form');
@@ -317,7 +314,8 @@ if (isOwn) {
 uploadLabel.classList.remove('hidden');
 bioView.classList.add('hidden');
 bioForm.classList.remove('hidden');
-document.getElementById('page-bio-input').value = profile.bio || '';
+const bioInput = document.getElementById('page-bio-input');
+if (bioInput) bioInput.value = profile.bio || '';
 document.getElementById('page-tg-input').value = profile.telegram || '';
 document.getElementById('page-wa-input').value = profile.whatsapp || '';
 passBox.classList.remove('hidden');
@@ -333,13 +331,12 @@ rateBox.classList.remove('hidden');
 const myPreviousVote = (profile.ratings_map || {})[myProfile.username] || 0;
 highlightInteractiveStars(myPreviousVote);
 document.getElementById('rate-status').textContent = myPreviousVote
-? Ваша оценка: ${myPreviousVote} ★ (можно изменить)
+? Ваша оценка: ${myPreviousVote} ★ (можно изменить)
 : 'Нажмите на звезду, чтобы проголосовать';
 } else {
 rateBox.classList.add('hidden');
 }
 }
-// Комментарии к объявлениям участника
 const { data: userAds } = await db.from('ads').select('title, comments').eq('author_username', profile.username);
 const commentsContainer = document.getElementById('profile-comments-list');
 commentsContainer.innerHTML = '';
@@ -350,7 +347,7 @@ userAds.forEach(ad => {
 hasComments = true;
 const div = document.createElement('div');
 div.className = 'comment-item';
-div.innerHTML = <span class="muted-text">К объявлению «${ad.title}»:</span><br><strong>${c.author}:</strong> ${c.text};
+div.innerHTML = <span class="muted-text">К объявлению «${ad.title}»:</span><br><strong>${c.author}:</strong> ${c.text};
 commentsContainer.appendChild(div);
 });
 });
@@ -360,7 +357,6 @@ commentsContainer.innerHTML = 'Комментариев к объявления�
 }
 showView('view-profile');
 }
-// --- АНИМАЦИЯ ЗВЁЗД ПРИ НАВЕДЕНИИ МЫШИ И НАЖАТИИ ---
 const starButtons = document.querySelectorAll('.star-btn');
 function highlightInteractiveStars(count, isHover = false) {
 starButtons.forEach(btn => {
@@ -402,14 +398,14 @@ await db.from('ads')
 viewedProfile.rating = newAverage;
 viewedProfile.ratings_map = updatedMap;
 document.getElementById('page-rating').innerHTML = renderStarsHTML(newAverage, allVotes.length);
-document.getElementById('rate-status').textContent = Спасибо! Ваша оценка (${chosenStars} ★) учтена.;
+document.getElementById('rate-status').textContent = Спасибо! Ваша оценка (${chosenStars} ★) учтена.;
 });
 });
-// Сохранение «О себе», Telegram и WhatsApp
 document.getElementById('bio-edit-form').addEventListener('submit', async (e) => {
 e.preventDefault();
 if (!myProfile) return;
-const newBio = document.getElementById('page-bio-input').value.trim();
+const bioInput = document.getElementById('page-bio-input');
+const newBio = bioInput ? bioInput.value.trim() : '';
 const newTg = document.getElementById('page-tg-input').value.trim().replace(/^@/, '');
 const newWa = document.getElementById('page-wa-input').value.trim();
 const { error } = await db.from('profiles')
@@ -425,9 +421,8 @@ myProfile.whatsapp = newWa;
 openOwnProfile();
 alert('Данные профиля и контакты для связи сохранены!');
 });
-// Загрузка аватарки
 document.getElementById('avatar-upload').addEventListener('change', function(e) {
-const file = e.target.files[0];
+const file = e.target.files;
 if (!file || !myProfile) return;
 const reader = new FileReader();
 reader.onload = function(event) {
@@ -450,7 +445,6 @@ img.src = event.target.result;
 };
 reader.readAsDataURL(file);
 });
-// Смена пароля
 document.getElementById('change-password-form').addEventListener('submit', async (e) => {
 e.preventDefault();
 const newPassword = document.getElementById('new-password').value;
@@ -461,7 +455,7 @@ alert('Пароль успешно изменён!');
 e.target.reset();
 }
 });
-// Поиск участников по логину
+if (userLoginSearch) {
 userLoginSearch.addEventListener('input', function() {
 const q = this.value.trim().replace(/^@/, '').toLowerCase();
 clearTimeout(userSearchTimeout);
@@ -472,7 +466,7 @@ return;
 userSearchTimeout = setTimeout(async () => {
 const { data } = await db.from('profiles')
 .select('username, name, location')
-.ilike('username', %${q}%)
+.ilike('username', %${q}%)
 .limit(8);
 userSearchResults.innerHTML = '';
 if (!data || data.length === 0) {
@@ -481,7 +475,7 @@ return;
 }
 data.forEach(u => {
 const li = document.createElement('li');
-li.textContent = @${u.username} — ${u.name} (${u.location || 'РФ'});
+li.textContent = @${u.username} — ${u.name} (${u.location || 'РФ'});
 li.onclick = () => {
 userLoginSearch.value = '';
 userSearchResults.classList.add('hidden');
@@ -492,6 +486,7 @@ userSearchResults.appendChild(li);
 userSearchResults.classList.remove('hidden');
 }, 300);
 });
+}
 // ==========================================
 // 4. ОБЪЯВЛЕНИЯ: ДАТЫ, РЕДАКТИРОВАНИЕ И ФИЛЬТРЫ
 // ==========================================
@@ -601,7 +596,7 @@ const text = input.value.trim();
 if (!text) return;
 const ad = ads.find(item => String(item.id) === String(id));
 if (!ad) return;
-const authorLabel = myProfile ? ${myProfile.name} (@${myProfile.username}) : 'Участник';
+const authorLabel = myProfile ? ${myProfile.name} (@${myProfile.username}) : 'Участник';
 const updatedComments = [...(ad.comments || []), { author: authorLabel, text }];
 ad.comments = updatedComments;
 renderAds();
@@ -638,11 +633,11 @@ let badgesHTML = '';
 if (ad.isPaid) badgesHTML += '💰 Платно';
 if (ad.isFree) badgesHTML += '🆓 Бесплатно';
 const avatarHTML = ad.avatar
-? <img src="${ad.avatar}" alt="${ad.author}" class="avatar-mini">
-: <div class="avatar-mini placeholder">${ad.author.charAt(0).toUpperCase()}</div>;
+? <img src="${ad.avatar}" alt="${ad.author}" class="avatar-mini">
+: <div class="avatar-mini placeholder">${ad.author.charAt(0).toUpperCase()}</div>;
 const starsHTML = renderStarsHTML(ad.rating);
 const isAuthor = myProfile && ad.author_email === myProfile.email;
-const ownerControlsHTML = isAuthor ? <div class="ad-actions"> <button type="button" class="btn-edit" onclick="startEditAd('${ad.id}')">✏️ Редактировать</button> <button type="button" class="btn-delete" onclick="deleteAd('${ad.id}')">🗑 Удалить</button> </div> : '';
+const ownerControlsHTML = isAuthor ? <div class="ad-actions"> <button type="button" class="btn-edit" onclick="startEditAd('${ad.id}')">✏️ Редактировать</button> <button type="button" class="btn-delete" onclick="deleteAd('${ad.id}')">🗑 Удалить</button> </div> : '';
 const commentsListHTML = (ad.comments || []).map(c =>
 <div class="comment-item"><strong>${c.author}:</strong> ${c.text}</div>
 ).join('');
@@ -697,7 +692,7 @@ if (!myProfile || !myProfile.location) return;
 isMyCityOnly = !isMyCityOnly;
 if (isMyCityOnly) {
 myCityBtn.classList.add('active');
-const mainCity = myProfile.location.split(',')[0].trim();
+const mainCity = myProfile.location.split(',').trim();
 document.getElementById('location-filter-input').value = mainCity;
 locationFilterQuery = mainCity;
 } else {
