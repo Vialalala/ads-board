@@ -3,7 +3,51 @@ const SUPABASE_URL = 'https://supabase.co';
 const SUPABASE_KEY = 'sb_publishable_pUeM-H4q3txd1tEtMvgwqg_jGqwxaLy';
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Состояние приложения
+// Встроенный быстрый справочник городов и регионов России (работает всегда без блокировок)
+const RUSSIA_CITIES = [
+    "г. Москва", "г. Санкт-Петербург", "г. Новосибирск, Новосибирская область",
+    "г. Екатеринбург, Свердловская область", "г. Казань, Республика Татарстан",
+    "г. Нижний Новгород, Нижегородская область", "г. Челябинск, Челябинская область",
+    "г. Красноярск, Красноярский край", "г. Самара, Самарская область",
+    "г. Уфа, Республика Башкортостан", "г. Ростов-на-Дону, Ростовская область",
+    "г. Омск, Омская область", "г. Краснодар, Краснодарский край",
+    "г. Воронеж, Воронежская область", "г. Пермь, Пермский край",
+    "г. Волгоград, Волгоградская область", "г. Саратов, Саратовская область",
+    "г. Тюмень, Тюменская область", "г. Тольятти, Самарская область",
+    "г. Ижевск, Удмуртская Республика", "г. Барнаул, Алтайский край",
+    "г. Ульяновск, Ульяновская область", "г. Иркутск, Иркутская область",
+    "г. Хабаровск, Хабаровский край", "г. Махачкала, Республика Дагестан",
+    "г. Ярославль, Ярославская область", "г. Владивосток, Приморский край",
+    "г. Оренбург, Оренбургская область", "г. Томск, Томская область",
+    "г. Кемерово, Кемеровская область", "г. Новокузнецк, Кемеровская область",
+    "г. Рязань, Рязанская область", "г. Набережные Челны, Республика Татарстан",
+    "г. Астрахань, Астраханская область", "г. Пенза, Пензенская область",
+    "г. Киров, Кировская область", "г. Липецк, Липецкая область",
+    "г. Балашиха, Московская область", "г. Чебоксары, Чувашская Республика",
+    "г. Калининград, Калининградская область", "г. Тула, Тульская область",
+    "г. Курск, Курская область", "г. Ставрополь, Ставропольский край",
+    "г. Сочи, Краснодарский край", "г. Улан-Удэ, Республика Бурятия",
+    "г. Тверь, Тверская область", "г. Магнитогорск, Челябинская область",
+    "г. Иваново, Ивановская область", "г. Брянск, Брянская область",
+    "г. Белгород, Белгородская область", "г. Сургут, Ханты-Мансийский АО",
+    "г. Владимир, Владимирская область", "г. Чита, Забайкальский край",
+    "г. Архангельск, Архангельская область", "г. Нижний Тагил, Свердловская область",
+    "г. Калуга, Калужская область", "г. Якутск, Республика Саха (Якутия)",
+    "г. Грозный, Чеченская Республика", "г. Волжский, Волгоградская область",
+    "г. Смоленск, Смоленская область", "г. Саранск, Республика Мордовия",
+    "г. Череповец, Вологодская область", "г. Курган, Курганская область",
+    "г. Подольск, Московская область", "г. Вологда, Вологодская область",
+    "г. Орёл, Орловская область", "г. Владикавказ, Республика Северная Осетия",
+    "г. Тамбов, Тамбовская область", "г. Мурманск, Мурманская область",
+    "г. Петрозаводск, Республика Карелия", "г. Нижневартовск, Ханты-Мансийский АО",
+    "г. Кострома, Костромская область", "г. Йошкар-Ола, Республика Марий Эл",
+    "г. Новороссийск, Краснодарский край", "г. Химки, Московская область",
+    "г. Мытищи, Московская область", "г. Люберцы, Московская область",
+    "г. Королёв, Московская область", "г. Красногорск, Московская область",
+    "г. Одинцово, Московская область", "г. Домодедово, Московская область",
+    "пос. Мурино, Ленинградская область", "г. Всеволожск, Ленинградская область"
+];
+
 let currentUser = null;
 let myProfile = null;
 let viewedProfile = null;
@@ -89,7 +133,11 @@ async function loadOrCreateMyProfile(user) {
             rating: 0,
             ratings_map: {}
         };
-        await db.from('profiles').insert([newProfile]);
+        const { error } = await db.from('profiles').insert([newProfile]);
+        if (error) {
+            console.error('Ошибка создания профиля в базе:', error);
+            alert('Внимание: профиль не сохранился в таблице profiles. Отключите RLS в Supabase! Ошибка: ' + error.message);
+        }
         myProfile = newProfile;
     }
 }
@@ -119,6 +167,27 @@ function updateNavbarProfile() {
     myCityBtn.textContent = shortCity ? `📍 Мой город (${shortCity})` : '📍 Мой населённый пункт';
 }
 
+// ==========================================
+// ГИБРИДНЫЙ ПОИСК НАСЕЛЁННЫХ ПУНКТОВ РФ
+// ==========================================
+function renderCitySuggestions(items) {
+    locationSuggestions.innerHTML = '';
+    if (items.length === 0) {
+        locationSuggestions.classList.add('hidden');
+        return;
+    }
+    items.forEach(fullName => {
+        const li = document.createElement('li');
+        li.textContent = fullName;
+        li.onclick = () => {
+            regLocationInput.value = fullName;
+            locationSuggestions.classList.add('hidden');
+        };
+        locationSuggestions.appendChild(li);
+    });
+    locationSuggestions.classList.remove('hidden');
+}
+
 if (regLocationInput) {
     regLocationInput.addEventListener('input', function() {
         const query = this.value.trim();
@@ -129,149 +198,145 @@ if (regLocationInput) {
             return;
         }
 
+        // 1. Мгновенный поиск по встроенному списку городов РФ
+        const qLower = query.toLowerCase();
+        const localMatches = RUSSIA_CITIES.filter(c => c.toLowerCase().includes(qLower));
+        renderCitySuggestions(localMatches);
+
+        // 2. Дополнительный поиск малых сёл, деревень и посёлков через Photon API
         locationTimeout = setTimeout(async () => {
             try {
-                // Используем быстрый геокодер Photon с фильтром по России
-                const url = `https://komoot.io{encodeURIComponent(query)}&lang=ru&limit=15`;
+                const url = `https://komoot.io{encodeURIComponent(query)}&lang=ru&limit=10`;
                 const res = await fetch(url);
                 const data = await res.json();
-                locationSuggestions.innerHTML = '';
 
-                if (!data.features || data.features.length === 0) {
-                    locationSuggestions.classList.add('hidden');
-                    return;
-                }
+                if (!data.features) return;
 
-                const unique = new Set();
+                const combined = new Set(localMatches);
                 data.features.forEach(feature => {
                     const props = feature.properties;
-                    // Оставляем только населённые пункты России
                     if (props.countrycode !== 'RU') return;
-                    
-                    const validTypes = ['city', 'town', 'village', 'hamlet', 'suburb', 'locality'];
-                    if (!validTypes.includes(props.osm_value) && !props.city) return;
 
                     const locality = props.name || props.city;
                     const district = props.county || props.district || '';
                     const region = props.state || '';
-
                     const parts = [locality, district, region].filter(Boolean);
                     const fullName = [...new Set(parts)].join(', ');
 
-                    if (fullName && !unique.has(fullName)) {
-                        unique.add(fullName);
-                        const li = document.createElement('li');
-                        li.textContent = fullName;
-                        li.onclick = () => {
-                            regLocationInput.value = fullName;
-                            locationSuggestions.classList.add('hidden');
-                        };
-                        locationSuggestions.appendChild(li);
-                    }
+                    if (fullName) combined.add(fullName);
                 });
 
-                if (unique.size > 0) {
-                    locationSuggestions.classList.remove('hidden');
-                } else {
-                    locationSuggestions.classList.add('hidden');
-                }
-            } catch (err) {
-                console.error('Ошибка поиска города:', err);
-            }
-        }, 300);
-    });
+renderCitySuggestions(Array.from(combined).slice(0, 10));
+} catch (err) {
+// Если внешний API заблокирован провайдером, остаётся локальный список
+console.log('Работает локальный справочник городов');
 }
-
+}, 350);
+});
+}
+document.addEventListener('click', (e) => {
+if (locationSuggestions && !e.target.closest('.autocomplete-wrapper')) {
+locationSuggestions.classList.add('hidden');
+}
+});
+// ==========================================
+// ОТПРАВКА ФОРМЫ РЕГИСТРАЦИИ
+// ==========================================
 document.getElementById('register-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const username = document.getElementById('reg-username').value.trim().toLowerCase();
-    const name = document.getElementById('reg-name').value.trim();
-    const location = regLocationInput.value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
-
-    const { data: existingUser } = await db.from('profiles').select('username').eq('username', username).single();
-    if (existingUser) {
-        alert('Этот логин уже занят! Пожалуйста, придумайте другой уникальный логин.');
-        return;
-    }
-
-    const { error } = await db.auth.signUp({
-        email,
-        password,
-        options: {
-            data: { username, name, location },
-            emailRedirectTo: window.location.href
-        }
-    });
-
-     if (error) {
-        alert('Ошибка регистрации: ' + error.message);
-    } else {
-        alert('Регистрация прошла успешно! Добро пожаловать в сервис «Няня рядом».');
-        e.target.reset();
-    }
+e.preventDefault();
+const submitBtn = e.target.querySelector('button[type="submit"]');
+const username = document.getElementById('reg-username').value.trim().toLowerCase();
+const name = document.getElementById('reg-name').value.trim();
+const location = regLocationInput.value.trim();
+const email = document.getElementById('reg-email').value.trim();
+const password = document.getElementById('reg-password').value;
+submitBtn.disabled = true;
+submitBtn.textContent = '⏳ Регистрируем...';
+try {
+// Проверяем уникальность логина
+const { data: existingUser } = await db.from('profiles').select('username').eq('username', username).maybeSingle();
+if (existingUser) {
+alert('Этот логин уже занят! Придумайте другой уникальный логин.');
+submitBtn.disabled = false;
+submitBtn.textContent = 'Зарегистрироваться';
+return;
+}
+const { data, error } = await db.auth.signUp({
+email,
+password,
+options: {
+data: { username, name, location },
+emailRedirectTo: window.location.href
+}
 });
-
+if (error) {
+alert('Ошибка при регистрации: ' + error.message);
+} else if (data && data.session) {
+// Если Confirm email отключён, вход происходит сразу
+alert('Регистрация успешна! Добро пожаловать в сервис «Няня рядом».');
+e.target.reset();
+} else {
+// Если Confirm email всё ещё включён в Supabase
+alert('Заявка принята! Проверьте почту ' + email + ' (включая папку «Спам») или отключите Confirm email в настройках Supabase для мгновенного входа.');
+e.target.reset();
+showView('view-login');
+}
+} catch (err) {
+alert('Сбой соединения с базой данных: ' + err.message);
+} finally {
+submitBtn.disabled = false;
+submitBtn.textContent = 'Зарегистрироваться';
+}
+});
 document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    let identifier = document.getElementById('login-identifier').value.trim();
-    const password = document.getElementById('login-password').value;
-
-    if (!identifier.includes('@')) {
-        const cleanLogin = identifier.replace(/^@/, '').toLowerCase();
-        const { data: prof } = await db.from('profiles').select('email').eq('username', cleanLogin).single();
-        if (!prof) {
-            alert('Пользователь с таким логином не найден.');
-            return;
-        }
-        identifier = prof.email;
-    }
-
-    const { error } = await db.auth.signInWithPassword({ email: identifier, password });
-    if (error) {
-        alert('Неверный логин/почта или пароль (либо почта ещё не подтверждена по ссылке из письма).');
-    }
+e.preventDefault();
+let identifier = document.getElementById('login-identifier').value.trim();
+const password = document.getElementById('login-password').value;
+if (!identifier.includes('@')) {
+const cleanLogin = identifier.replace(/^@/, '').toLowerCase();
+const { data: prof } = await db.from('profiles').select('email').eq('username', cleanLogin).maybeSingle();
+if (!prof) {
+alert('Пользователь с таким логином не найден.');
+return;
+}
+identifier = prof.email;
+}
+const { error } = await db.auth.signInWithPassword({ email: identifier, password });
+if (error) {
+alert('Ошибка входа: ' + error.message);
+}
 });
-
 document.getElementById('reset-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('reset-email').value.trim();
-    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
-
-    if (error) {
-        alert('Ошибка: ' + error.message);
-    } else {
-        alert('Ссылка для входа в профиль и смены пароля отправлена на ' + email);
-        e.target.reset();
-    }
+e.preventDefault();
+const email = document.getElementById('reset-email').value.trim();
+const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+if (error) {
+alert('Ошибка отправки письма: ' + error.message);
+} else {
+alert('Ссылка для входа и смены пароля отправлена на ' + email);
+e.target.reset();
+}
 });
-
 document.getElementById('logout-btn').addEventListener('click', async () => {
-    await db.auth.signOut();
+await db.auth.signOut();
 });
-
 // ==========================================
 // 3. ПРОФИЛЬ, КОНТАКТЫ И ГОЛОСОВАНИЕ ЗА РЕЙТИНГ
 // ==========================================
 function openOwnProfile() {
-    if (myProfile) openUserProfile(myProfile.username);
+if (myProfile) openUserProfile(myProfile.username);
 }
-
 async function openUserProfile(username) {
-    const cleanLogin = username.replace(/^@/, '').toLowerCase();
-    const { data: profile, error } = await db.from('profiles').select('*').eq('username', cleanLogin).single();
-
-    if (error || !profile) {
-        alert('Профиль участника не найден.');
-        return;
-    }
-
-    viewedProfile = profile;
-    const isOwn = myProfile && profile.email === myProfile.email;
-
-    document.getElementById('page-name').textContent = profile.name;
-    document.getElementById('page-username').textContent = '@' + profile.username;
+const cleanLogin = username.replace(/^@/, '').toLowerCase();
+const { data: profile, error } = await db.from('profiles').select('*').eq('username', cleanLogin).maybeSingle();
+if (error || !profile) {
+alert('Профиль участника не найден.');
+return;
+}
+viewedProfile = profile;
+const isOwn = myProfile && profile.email === myProfile.email;
+document.getElementById('page-name').textContent = profile.name;
+document.getElementById('page-username').textContent = '@' + profile.username;
 document.getElementById('page-location').textContent = '📍 ' + (profile.location || 'Населённый пункт не указан');
 const votesCount = Object.keys(profile.ratings_map || {}).length;
 document.getElementById('page-rating').innerHTML = renderStarsHTML(profile.rating, votesCount);
@@ -674,7 +739,6 @@ ${commentsListHTML || 'Комментариев пока нет'}
 adsList.appendChild(article);
 });
 }
-// Обработчики фильтров
 document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
 btn.addEventListener('click', function() {
 document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
