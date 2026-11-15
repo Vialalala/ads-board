@@ -191,3 +191,92 @@
                     <img id="page-avatar-img" src="" alt="Аватар" class="avatar-large hidden">
                     <div id="page-avatar-placeholder" class="avatar-large placeholder">?</div>
                     <label id="avatar-upload-label" for="avatar-upload" class="upload-label">📷 Загрузить фото</label>
+
+                        <!-- СТРАНИЦА 6: ПРОСМОТР И РЕДАКТИРОВАНИЕ ПРОФИЛЯ -->
+    <div id="view-profile" class="view-screen hidden">
+        <header class="top-navbar">
+            <button type="button" class="btn-back" onclick="openFeed()">← Вернуться к объявлениям</button>
+            <button type="button" id="logout-btn" class="btn-secondary btn-small">Выйти из аккаунта</button>
+        </header>
+
+        <section class="profile-page-card">
+            <div class="profile-main-info">
+                <div class="avatar-wrapper">
+                    <img id="page-avatar-img" src="" alt="Аватар" class="avatar-large hidden">
+                    <div id="page-avatar-placeholder" class="avatar-large placeholder">?</div>
+                    <label id="avatar-upload-label" for="avatar-upload" class="upload-label">📷 Загрузить фото</label>
+                    <input type="file" id="avatar-upload" accept="image/*" class="hidden">
+                </div>
+
+                <div class="profile-details">
+                    <h2 id="page-name">Имя пользователя</h2>
+                    <p id="page-username" class="login-badge">@username</p>
+                    <p id="page-location" class="location-tag">📍 Населённый пункт</p>
+                    <div id="page-rating" class="rating-display"></div>
+
+                    <!-- Кнопки быстрой связи через Telegram и WhatsApp -->
+                    <div id="contact-buttons-box" class="contact-links hidden">
+                        <a id="tg-contact-link" href="#" target="_blank" rel="noopener noreferrer" class="messenger-btn tg-btn hidden">✈️ Написать в Telegram</a>
+                        <a id="wa-contact-link" href="#" target="_blank" rel="noopener noreferrer" class="messenger-btn wa-btn hidden">💬 Написать в WhatsApp</a>
+                    </div>
+
+                    <!-- Интерактивный рейтинг (5 звёзд для оценки других участников) -->
+                    <div id="rate-user-box" class="rate-box hidden">
+                        <span class="rate-label">Оцените участника:</span>
+                        <div class="interactive-stars" id="interactive-stars">
+                            <span class="star-btn" data-value="1">★</span>
+                            <span class="star-btn" data-value="2">★</span>
+                            <span class="star-btn" data-value="3">★</span>
+                            <span class="star-btn" data-value="4">★</span>
+                            <span class="star-btn" data-value="5">★</span>
+                        </div>
+                        <span id="rate-status" class="hint-text"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bio-section">
+                <h3>Информация о себе и контакты для связи</h3>
+                
+                <!-- Режим просмотра (когда зашли в чужой профиль) -->
+                <div id="bio-view-mode">
+                    <p id="page-bio-text" class="bio-text">Пользователь пока не добавил информацию о себе.</p>
+                </div>
+
+                <!-- Режим редактирования (когда открыли свой профиль) -->
+                <form id="bio-edit-form" class="hidden">
+                    <label for="page-bio-input">Опыт работы с детьми, образование, возраст ваших детей:</label>
+                    <textarea id="page-bio-input" rows="4" placeholder="Расскажите о себе и вашем опыте..."></textarea>
+
+                    <div class="search-grid">
+                        <div>
+                            <label for="page-tg-input">Ник в Telegram (без @):</label>
+                            <input type="text" id="page-tg-input" placeholder="Например: anna_nyanya">
+                        </div>
+                        <div>
+                            <label for="page-wa-input">Телефон для WhatsApp (с 7):</label>
+                            <input type="text" id="page-wa-input" placeholder="Например: 79991234567">
+                        </div>
+                    </div>
+
+                    <button type="submit">Сохранить данные профиля</button>
+                </form>
+            </div>
+
+            <!-- Смена пароля внутри своего профиля -->
+            <details id="own-password-box" class="password-details hidden">
+                <summary>🔑 Изменить пароль от аккаунта</summary>
+                <form id="change-password-form" class="inline-form">
+                    <input type="password" id="new-password" placeholder="Новый пароль (от 6 символов)" minlength="6" required>
+                    <button type="submit">Сохранить новый пароль</button>
+                </form>
+            </details>
+        </section>
+
+        <section>
+            <h3 id="profile-comments-title">Комментарии к объявлениям участника</h3>
+            <div id="profile-comments-list"></div>
+        </section>
+    </div>
+
+
