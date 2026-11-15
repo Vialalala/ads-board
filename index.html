@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Сервис взаимопомощи родителей Няня рядом 👶🏻</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Независимый переключатель экранов (работает всегда и сразу) -->
+    <script>
+        function showView(viewId) {
+            var screens = document.querySelectorAll('.view-screen');
+            for (var i = 0; i < screens.length; i++) {
+                screens[i].classList.add('hidden');
+            }
+            var target = document.getElementById(viewId);
+            if (target) {
+                target.classList.remove('hidden');
+            }
+            window.scrollTo(0, 0);
+        }
+    </script>
 </head>
 <body>
 
@@ -177,16 +191,10 @@
                     <img id="page-avatar-img" src="" alt="Аватар" class="avatar-large hidden">
                     <div id="page-avatar-placeholder" class="avatar-large placeholder">?</div>
                     <label id="avatar-upload-label" for="avatar-upload" class="upload-label">📷 Загрузить фото</label>
-                    <input type="file" id="avatar-upload" accept="image/*" class="hidden">
-                </div>
 
-                <div class="profile-details">
-                    <h2 id="page-name">Имя пользователя</h2>
-                    <p id="page-username" class="login-badge">@username</p>
-                    <p id="page-location" class="location-tag">📍 Населённый пункт</p>
-                    <div id="page-rating" class="rating-display"></div>
-
-
+Имя пользователя
+@username
+📍 Населённый пункт
 ✈️ Написать в Telegram
 💬 Написать в WhatsApp
 Оцените участника:
@@ -215,14 +223,3 @@
 Сохранить новый пароль
 
 Комментарии к объявлениям участника
-
-function showView(viewId) {
-document.querySelectorAll('.view-screen').forEach(function(el) {
-el.classList.add('hidden');
-});
-var target = document.getElementById(viewId);
-if (target) {
-target.classList.remove('hidden');
-}
-window.scrollTo(0, 0);
-}
