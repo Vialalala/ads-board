@@ -1,217 +1,721 @@
-// Элементы авторизации
-const authSection = document.getElementById('auth-section');
-const authForm = document.getElementById('auth-form');
-const smsStep = document.getElementById('sms-step');
-const smsCodeInput = document.getElementById('sms-code');
-const authSubmitBtn = document.getElementById('auth-submit-btn');
-
-const userProfile = document.getElementById('user-profile');
-const profileName = document.getElementById('profile-name');
-const profilePhone = document.getElementById('profile-phone');
-const logoutBtn = document.getElementById('logout-btn');
-
-// Элементы объявлений и поиска
-const adForm = document.getElementById('ad-form');
-const adAuthorInput = document.getElementById('ad-author');
-const adsList = document.getElementById('ads-list');
-const filterButtons = document.querySelectorAll('.filter-btn');
-const searchInput = document.getElementById('search-input');
+// ПОДКЛЮЧЕНИЕ К ВАШЕЙ ОБЛАЧНОЙ БАЗЕ ДАННЫХ SUPABASE:
+const SUPABASE_URL = 'https://geahyanxykxrgdnhyxwr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_pUeM-H4q3txd1tEtMvgwqg_jGqwxaLy';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Состояние приложения
-let isSmsSent = false;
-let currentUser = JSON.parse(localStorage.getItem('my_board_user')) || null;
-let currentFilter = 'all';
+let currentUser = null;
+let myProfile = null;
+let viewedProfile = null;
+let ads = [];
+let currentPayFilter = 'all';
+let currentDaysFilter = 'all';
+let isMyCityOnly = false;
 let searchQuery = '';
+let locationFilterQuery = '';
+let locationTimeout = null;
+let userSearchTimeout = null;
 
-// Стартовые объявления (isCustom: false — нельзя удалить)
-const defaultAds = [
-    {
-        id: 1,
-        title: 'Отдам даром детский велосипед',
-        author: 'Елена Смирнова',
-        text: 'Велосипед в хорошем состоянии, ребенок вырос. Самовывоз в выходные дни.',
-        isPaid: false,
-        isFree: true,
-        isCustom: false
-    },
-    {
-        id: 2,
-        title: 'Ремонт стиральных машин на дому',
-        author: 'Дмитрий Мастер',
-        text: 'Быстрый выезд по городу. Гарантия на все запчасти и выполненную работу до 1 года.',
-        isPaid: true,
-        isFree: false,
-        isCustom: false
-    },
-    {
-        id: 3,
-        title: 'Компьютерный стол и стул',
-        author: 'Игорь К.',
-        text: 'Стол продаю за символическую плату, а офисный стул отдам в подарок к нему.',
-        isPaid: true,
-        isFree: true,
-        isCustom: false
-    }
-];
+const regLocationInput = document.getElementById('reg-location');
+const locationSuggestions = document.getElementById('location-suggestions');
+const userLoginSearch = document.getElementById('user-login-search');
+const userSearchResults = document.getElementById('user-search-results');
 
-let ads = JSON.parse(localStorage.getItem('my_board_ads')) || defaultAds;
+const adForm = document.getElementById('ad-form');
+const adsList = document.getElementById('ads-list');
+const refreshAdsBtn = document.getElementById('refresh-ads-btn');
+const myCityBtn = document.getElementById('my-city-btn');
 
-// --- БЛОК АВТОРИЗАЦИИ ---
-
-function updateAuthUI() {
-    if (currentUser) {
-        authSection.classList.add('hidden');
-        userProfile.classList.remove('hidden');
-        profileName.textContent = currentUser.name;
-        profilePhone.textContent = currentUser.phone;
-        adAuthorInput.value = currentUser.name; // Автоподстановка имени
-    } else {
-        authSection.classList.remove('hidden');
-        userProfile.classList.add('hidden');
-        smsStep.classList.add('hidden');
-        authSubmitBtn.textContent = 'Получить код по СМС';
-        isSmsSent = false;
-        authForm.reset();
-    }
+// ==========================================
+// 1. НАВИГАЦИЯ И ОТРИСОВКА 5 ЗВЁЗД РЕЙТИНГА
+// ==========================================
+function showView(viewId) {
+    document.querySelectorAll('.view-screen').forEach(el => el.classList.add('hidden'));
+    document.getElementById(viewId).classList.remove('hidden');
+    window.scrollTo(0, 0);
 }
 
-authForm.addEventListener('submit', function(event) {
-    event.preventDefault();
+function openFeed() {
+    showView('view-feed');
+    loadAds();
+}
 
-    if (!isSmsSent) {
-        // Шаг 1: Имитация отправки СМС
-        isSmsSent = true;
-        smsStep.classList.remove('hidden');
-        smsCodeInput.required = true;
-        smsCodeInput.focus();
-        authSubmitBtn.textContent = 'Подтвердить и войти';
-        alert('Тестовый код из СМС: 1234 (можно ввести любые 4 цифры)');
+function renderStarsHTML(rating, votesCount = null) {
+    const score = Number(rating) || 0;
+    const filledCount = Math.round(score);
+    
+    let stars = '<span class="stars-row">';
+    for (let i = 1; i <= 5; i++) {
+        const isFilled = i <= filledCount ? 'filled' : '';
+        stars += `<span class="star-icon ${isFilled}">★</span>`;
+    }
+    
+    if (score > 0) {
+        const votesText = votesCount !== null ? `, голосов: ${votesCount}` : '';
+        stars += `<span class="rating-score-text">${score.toFixed(1)}${votesText}</span>`;
     } else {
-        // Шаг 2: Проверка длины кода и вход
-        if (smsCodeInput.value.trim().length < 4) {
-            alert('Пожалуйста, введите 4-значный код из СМС.');
-            return;
-        }
-        currentUser = {
-            name: document.getElementById('user-name').value.trim(),
-            phone: document.getElementById('user-phone').value.trim()
+        stars += `<span class="rating-score-text">нет оценок</span>`;
+    }
+    stars += '</span>';
+    return stars;
+}
+
+// ==========================================
+// 2. АВТОРИЗАЦИЯ И РЕГИСТРАЦИЯ
+// ==========================================
+db.auth.onAuthStateChange(async (event, session) => {
+    if (session && session.user) {
+        currentUser = session.user;
+        await loadOrCreateMyProfile(currentUser);
+        updateNavbarProfile();
+        openFeed();
+    } else {
+        currentUser = null;
+        myProfile = null;
+        showView('view-landing');
+    }
+});
+
+async function loadOrCreateMyProfile(user) {
+    const { data } = await db.from('profiles').select('*').eq('email', user.email).single();
+    if (data) {
+        myProfile = data;
+    } else {
+        const meta = user.user_metadata || {};
+        const newProfile = {
+            email: user.email,
+            username: meta.username || user.email.split('@')[0],
+            name: meta.name || 'Родитель',
+            location: meta.location || 'Россия',
+            bio: '',
+            telegram: '',
+            whatsapp: '',
+            avatar: '',
+            rating: 0,
+            ratings_map: {}
         };
-        localStorage.setItem('my_board_user', JSON.stringify(currentUser));
-        updateAuthUI();
-    }
-});
-
-logoutBtn.addEventListener('click', function() {
-    currentUser = null;
-    localStorage.removeItem('my_board_user');
-    adAuthorInput.value = '';
-    updateAuthUI();
-});
-
-// --- БЛОК ОБЪЯВЛЕНИЙ, ПОИСКА И УДАЛЕНИЯ ---
-
-function saveAds() {
-    localStorage.setItem('my_board_ads', JSON.stringify(ads));
-}
-
-function deleteAd(id) {
-    if (confirm('Вы действительно хотите удалить это объявление?')) {
-        ads = ads.filter(ad => ad.id !== id);
-        saveAds();
-        renderAds();
+        await db.from('profiles').insert([newProfile]);
+        myProfile = newProfile;
     }
 }
 
-function renderAds() {
-    adsList.innerHTML = '';
+function updateNavbarProfile() {
+    if (!myProfile) return;
+    document.getElementById('nav-username').textContent = '@' + myProfile.username;
+    
+    const votesCount = Object.keys(myProfile.ratings_map || {}).length;
+    document.getElementById('nav-rating').innerHTML = renderStarsHTML(myProfile.rating, votesCount);
 
-    const filteredAds = ads.filter(ad => {
-        // 1. Проверка по кнопкам фильтра
-        const matchesFilter = 
-            currentFilter === 'all' ||
-            (currentFilter === 'paid' && ad.isPaid) ||
-            (currentFilter === 'free' && ad.isFree);
+    const navImg = document.getElementById('nav-avatar-img');
+    const navPlace = document.getElementById('nav-avatar-placeholder');
+    if (myProfile.avatar) {
+        navImg.src = myProfile.avatar;
+        navImg.classList.remove('hidden');
+        navPlace.classList.add('hidden');
+    } else {
+        navPlace.textContent = myProfile.name.charAt(0).toUpperCase();
+        navPlace.classList.remove('hidden');
+        navImg.classList.add('hidden');
+    }
 
-        // 2. Проверка по строке поиска (без учёта регистра)
-        const query = searchQuery.toLowerCase();
-        const matchesSearch = 
-            ad.title.toLowerCase().includes(query) ||
-            ad.text.toLowerCase().includes(query) ||
-            ad.author.toLowerCase().includes(query);
+    document.getElementById('ad-location').value = myProfile.location || '';
+    const shortCity = (myProfile.location || '').split(',')[0];
+    myCityBtn.textContent = `📍 Мой город (${shortCity})`;
+}
 
-        return matchesFilter && matchesSearch;
-    });
+regLocationInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    clearTimeout(locationTimeout);
 
-    if (filteredAds.length === 0) {
-        adsList.innerHTML = '<p>Ничего не найдено. Попробуйте изменить запрос или фильтр.</p>';
+    if (query.length < 2) {
+        locationSuggestions.classList.add('hidden');
         return;
     }
 
-    filteredAds.forEach(ad => {
-        let badgesHTML = '';
-        if (ad.isPaid) badgesHTML += '<span class="badge">💰 Платно</span> ';
-        if (ad.isFree) badgesHTML += '<span class="badge">🆓 Бесплатно</span>';
+    locationTimeout = setTimeout(async () => {
+        try {
+            const url = `https://openstreetmap.org{encodeURIComponent(query)}&countrycodes=ru&format=json&addressdetails=1&limit=10&accept-language=ru`;
+            const res = await fetch(url);
+            const places = await res.json();
+            locationSuggestions.innerHTML = '';
 
-        // Кнопка удаления показывается только для добавленных пользователем карточек
-        const deleteBtnHTML = ad.isCustom 
-            ? `<button type="button" class="btn-delete" onclick="deleteAd(${ad.id})">🗑 Удалить</button>` 
-            : '';
+            const settlements = places.filter(p => 
+                p.address && (p.address.city || p.address.town || p.address.village || p.address.hamlet || p.address.suburb)
+            );
 
-        const article = document.createElement('article');
-        article.innerHTML = `
-            <div class="ad-header">
-                <h3>${ad.title}</h3>
-                ${deleteBtnHTML}
-            </div>
-            <p><strong>Автор:</strong> ${ad.author}</p>
-            <p>${ad.text}</p>
-            <footer class="badges">${badgesHTML}</footer>
-        `;
-        adsList.appendChild(article);
+            if (settlements.length === 0) {
+                locationSuggestions.classList.add('hidden');
+                return;
+            }
+
+            const unique = new Set();
+            settlements.forEach(place => {
+                const addr = place.address;
+                const loc = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb;
+                const dist = addr.county || addr.district || '';
+                const reg = addr.state || addr.region || '';
+                const fullName = [...new Set([loc, dist, reg].filter(Boolean))].join(', ');
+
+                if (!unique.has(fullName)) {
+                    unique.add(fullName);
+                    const li = document.createElement('li');
+                    li.textContent = fullName;
+                    li.onclick = () => {
+                        regLocationInput.value = fullName;
+                        locationSuggestions.classList.add('hidden');
+                    };
+                    locationSuggestions.appendChild(li);
+                }
+            });
+            locationSuggestions.classList.remove('hidden');
+        } catch (err) {
+            console.error(err);
+        }
+    }, 400);
+});
+
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('reg-username').value.trim().toLowerCase();
+    const name = document.getElementById('reg-name').value.trim();
+    const location = regLocationInput.value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+
+    const { data: existingUser } = await db.from('profiles').select('username').eq('username', username).single();
+    if (existingUser) {
+        alert('Этот логин уже занят! Пожалуйста, придумайте другой уникальный логин.');
+        return;
+    }
+
+    const { error } = await db.auth.signUp({
+        email,
+        password,
+        options: {
+            data: { username, name, location },
+            emailRedirectTo: window.location.href
+        }
     });
-}
 
-// Публикация нового объявления
-adForm.addEventListener('submit', function(event) {
-    event.preventDefault();
-
-    const newAd = {
-        id: Date.now(), // Уникальный номер на основе текущего времени
-        title: document.getElementById('ad-title').value,
-        author: adAuthorInput.value,
-        text: document.getElementById('ad-text').value,
-        isPaid: document.getElementById('is-paid').checked,
-        isFree: document.getElementById('is-free').checked,
-        isCustom: true
-    };
-
-    ads.unshift(newAd);
-    saveAds();
-    renderAds();
-    adForm.reset();
-
-    // Если пользователь авторизован, возвращаем его имя в поле автора
-    if (currentUser) {
-        adAuthorInput.value = currentUser.name;
+    if (error) {
+        alert('Ошибка регистрации: ' + error.message);
+    } else {
+        alert('Письмо со ссылкой отправлено на ' + email + '. Перейдите по ссылке в письме для подтверждения и входа!');
+        e.target.reset();
+        showView('view-login');
     }
 });
 
-// Переключение фильтров
-filterButtons.forEach(button => {
-    button.addEventListener('click', function() {
-        filterButtons.forEach(btn => btn.classList.remove('active'));
-        this.classList.add('active');
-        currentFilter = this.dataset.filter;
-        renderAds();
-    });
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    let identifier = document.getElementById('login-identifier').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!identifier.includes('@')) {
+        const cleanLogin = identifier.replace(/^@/, '').toLowerCase();
+        const { data: prof } = await db.from('profiles').select('email').eq('username', cleanLogin).single();
+        if (!prof) {
+            alert('Пользователь с таким логином не найден.');
+            return;
+        }
+        identifier = prof.email;
+    }
+
+    const { error } = await db.auth.signInWithPassword({ email: identifier, password });
+    if (error) {
+        alert('Неверный логин/почта или пароль (либо почта ещё не подтверждена по ссылке из письма).');
+    }
 });
 
-// Живой поиск при вводе текста
-searchInput.addEventListener('input', function() {
-    searchQuery = this.value.trim();
-    renderAds();
+document.getElementById('reset-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('reset-email').value.trim();
+    const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+
+    if (error) {
+        alert('Ошибка: ' + error.message);
+    } else {
+        alert('Ссылка для входа в профиль и смены пароля отправлена на ' + email);
+        e.target.reset();
+    }
 });
 
-// Запуск при открытии страницы
-updateAuthUI();
+document.getElementById('logout-btn').addEventListener('click', async () => {
+    await db.auth.signOut();
+});
+
+// ==========================================
+// 3. ПРОФИЛЬ, КОНТАКТЫ И ГОЛОСОВАНИЕ ЗА РЕЙТИНГ
+// ==========================================
+function openOwnProfile() {
+    if (myProfile) openUserProfile(myProfile.username);
+}
+
+async function openUserProfile(username) {
+    const cleanLogin = username.replace(/^@/, '').toLowerCase();
+    const { data: profile, error } = await db.from('profiles').select('*').eq('username', cleanLogin).single();
+
+    if (error || !profile) {
+        alert('Профиль участника не найден.');
+        return;
+    }
+
+    viewedProfile = profile;
+    const isOwn = myProfile && profile.email === myProfile.email;
+
+    document.getElementById('page-name').textContent = profile.name;
+    document.getElementById('page-username').textContent = '@' + profile.username;
+    document.getElementById('page-location').textContent = '📍 ' + (profile.location || 'Населённый пункт не указан');
+    
+    const votesCount = Object.keys(profile.ratings_map || {}).length;
+
+
+document.getElementById('page-rating').innerHTML = renderStarsHTML(profile.rating, votesCount);
+// Аватарка
+const imgEl = document.getElementById('page-avatar-img');
+const placeEl = document.getElementById('page-avatar-placeholder');
+if (profile.avatar) {
+imgEl.src = profile.avatar;
+imgEl.classList.remove('hidden');
+placeEl.classList.add('hidden');
+} else {
+placeEl.textContent = profile.name.charAt(0).toUpperCase();
+placeEl.classList.remove('hidden');
+imgEl.classList.add('hidden');
+}
+// Кнопки быстрой связи через Telegram и WhatsApp с автоподстановкой приветствия
+const contactBox = document.getElementById('contact-buttons-box');
+const tgLink = document.getElementById('tg-contact-link');
+const waLink = document.getElementById('wa-contact-link');
+const defaultMsg = encodeURIComponent('Здравствуйте! Пишу вам с сервиса «Няня рядом» по поводу присмотра за ребёнком.');
+let hasContacts = false;
+if (profile.telegram) {
+const cleanTg = profile.telegram.replace(/^@/, '').trim();
+tgLink.href = https://t.me{cleanTg}?text=${defaultMsg};
+tgLink.classList.remove('hidden');
+hasContacts = true;
+} else {
+tgLink.classList.add('hidden');
+}
+if (profile.whatsapp) {
+const cleanWa = profile.whatsapp.replace(/\D/g, '');
+waLink.href = https://wa.me{cleanWa}?text=${defaultMsg};
+waLink.classList.remove('hidden');
+hasContacts = true;
+} else {
+waLink.classList.add('hidden');
+}
+if (hasContacts) contactBox.classList.remove('hidden');
+else contactBox.classList.add('hidden');
+// Редактирование профиля или голосование за участника
+const uploadLabel = document.getElementById('avatar-upload-label');
+const bioView = document.getElementById('bio-view-mode');
+const bioForm = document.getElementById('bio-edit-form');
+const passBox = document.getElementById('own-password-box');
+const rateBox = document.getElementById('rate-user-box');
+if (isOwn) {
+uploadLabel.classList.remove('hidden');
+bioView.classList.add('hidden');
+bioForm.classList.remove('hidden');
+document.getElementById('page-bio-input').value = profile.bio || '';
+document.getElementById('page-tg-input').value = profile.telegram || '';
+document.getElementById('page-wa-input').value = profile.whatsapp || '';
+passBox.classList.remove('hidden');
+rateBox.classList.add('hidden');
+} else {
+uploadLabel.classList.add('hidden');
+bioView.classList.remove('hidden');
+bioForm.classList.add('hidden');
+document.getElementById('page-bio-text').textContent = profile.bio || 'Участник пока не добавил информацию о себе.';
+passBox.classList.add('hidden');
+if (myProfile) {
+rateBox.classList.remove('hidden');
+const myPreviousVote = (profile.ratings_map || {})[myProfile.username] || 0;
+highlightInteractiveStars(myPreviousVote);
+document.getElementById('rate-status').textContent = myPreviousVote
+? Ваша оценка: ${myPreviousVote} ★ (можно изменить)
+: 'Нажмите на звезду, чтобы проголосовать';
+} else {
+rateBox.classList.add('hidden');
+}
+}
+// Комментарии к объявлениям участника
+const { data: userAds } = await db.from('ads').select('title, comments').eq('author_username', profile.username);
+const commentsContainer = document.getElementById('profile-comments-list');
+commentsContainer.innerHTML = '';
+let hasComments = false;
+if (userAds) {
+userAds.forEach(ad => {
+(ad.comments || []).forEach(c => {
+hasComments = true;
+const div = document.createElement('div');
+div.className = 'comment-item';
+div.innerHTML = <span class="muted-text">К объявлению «${ad.title}»:</span><br><strong>${c.author}:</strong> ${c.text};
+commentsContainer.appendChild(div);
+});
+});
+}
+if (!hasComments) {
+commentsContainer.innerHTML = 'Комментариев к объявлениям этого участника пока нет.';
+}
+showView('view-profile');
+}
+// --- АНИМАЦИЯ ЗВЁЗД ПРИ НАВЕДЕНИИ МЫШИ И НАЖАТИИ ---
+const starButtons = document.querySelectorAll('.star-btn');
+function highlightInteractiveStars(count, isHover = false) {
+starButtons.forEach(btn => {
+const val = Number(btn.dataset.value);
+btn.classList.remove('hovered', 'clicked');
+if (val <= count) {
+btn.classList.add(isHover ? 'hovered' : 'clicked');
+}
+});
+}
+starButtons.forEach(btn => {
+btn.addEventListener('mouseenter', () => {
+const hoverVal = Number(btn.dataset.value);
+highlightInteractiveStars(hoverVal, true);
+});
+btn.addEventListener('mouseleave', () => {
+if (!viewedProfile || !myProfile) return;
+const myVote = (viewedProfile.ratings_map || {})[myProfile.username] || 0;
+highlightInteractiveStars(myVote, false);
+});
+btn.addEventListener('click', async () => {
+if (!viewedProfile || !myProfile) return;
+if (viewedProfile.email === myProfile.email) {
+alert('Нельзя голосовать за собственный рейтинг.');
+return;
+}
+const chosenStars = Number(btn.dataset.value);
+highlightInteractiveStars(chosenStars, false);
+const updatedMap = { ...(viewedProfile.ratings_map || {}), [myProfile.username]: chosenStars };
+const allVotes = Object.values(updatedMap).map(Number);
+const sum = allVotes.reduce((acc, v) => acc + v, 0);
+const newAverage = sum / allVotes.length;
+await db.from('profiles')
+.update({ rating: newAverage, ratings_map: updatedMap })
+.eq('username', viewedProfile.username);
+await db.from('ads')
+.update({ rating: newAverage })
+.eq('author_username', viewedProfile.username);
+viewedProfile.rating = newAverage;
+viewedProfile.ratings_map = updatedMap;
+document.getElementById('page-rating').innerHTML = renderStarsHTML(newAverage, allVotes.length);
+document.getElementById('rate-status').textContent = Спасибо! Ваша оценка (${chosenStars} ★) учтена.;
+});
+});
+// Сохранение «О себе», Telegram и WhatsApp
+document.getElementById('bio-edit-form').addEventListener('submit', async (e) => {
+e.preventDefault();
+if (!myProfile) return;
+const newBio = document.getElementById('page-bio-input').value.trim();
+const newTg = document.getElementById('page-tg-input').value.trim().replace(/^@/, '');
+const newWa = document.getElementById('page-wa-input').value.trim();
+const { error } = await db.from('profiles')
+.update({ bio: newBio, telegram: newTg, whatsapp: newWa })
+.eq('email', myProfile.email);
+if (error) {
+alert('Ошибка при сохранении профиля: ' + error.message);
+return;
+}
+myProfile.bio = newBio;
+myProfile.telegram = newTg;
+myProfile.whatsapp = newWa;
+openOwnProfile();
+alert('Данные профиля и контакты для связи сохранены!');
+});
+// Загрузка аватарки
+document.getElementById('avatar-upload').addEventListener('change', function(e) {
+const file = e.target.files[0];
+if (!file || !myProfile) return;
+const reader = new FileReader();
+reader.onload = function(event) {
+const img = new Image();
+img.onload = async function() {
+const canvas = document.createElement('canvas');
+canvas.width = 140;
+canvas.height = 140;
+const ctx = canvas.getContext('2d');
+ctx.drawImage(img, 0, 0, 140, 140);
+const base64 = canvas.toDataURL('image/jpeg', 0.8);
+await db.from('profiles').update({ avatar: base64 }).eq('email', myProfile.email);
+await db.from('ads').update({ avatar: base64 }).eq('author_username', myProfile.username);
+myProfile.avatar = base64;
+updateNavbarProfile();
+openOwnProfile();
+alert('Фото профиля обновлено!');
+};
+img.src = event.target.result;
+};
+reader.readAsDataURL(file);
+});
+// Смена пароля
+document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+e.preventDefault();
+const newPassword = document.getElementById('new-password').value;
+const { error } = await db.auth.updateUser({ password: newPassword });
+if (error) alert('Ошибка: ' + error.message);
+else {
+alert('Пароль успешно изменён!');
+e.target.reset();
+}
+});
+// Поиск участников по логину
+userLoginSearch.addEventListener('input', function() {
+const q = this.value.trim().replace(/^@/, '').toLowerCase();
+clearTimeout(userSearchTimeout);
+if (q.length < 1) {
+userSearchResults.classList.add('hidden');
+return;
+}
+userSearchTimeout = setTimeout(async () => {
+const { data } = await db.from('profiles')
+.select('username, name, location')
+.ilike('username', %${q}%)
+.limit(8);
+userSearchResults.innerHTML = '';
+if (!data || data.length === 0) {
+userSearchResults.classList.add('hidden');
+return;
+}
+data.forEach(u => {
+const li = document.createElement('li');
+li.textContent = @${u.username} — ${u.name} (${u.location || 'РФ'});
+li.onclick = () => {
+userLoginSearch.value = '';
+userSearchResults.classList.add('hidden');
+openUserProfile(u.username);
+};
+userSearchResults.appendChild(li);
+});
+userSearchResults.classList.remove('hidden');
+}, 300);
+});
+// ==========================================
+// 4. ОБЪЯВЛЕНИЯ: ДАТЫ, РЕДАКТИРОВАНИЕ И ФИЛЬТРЫ
+// ==========================================
+function formatDate(timestamp) {
+if (!timestamp) return 'Недавно';
+const d = new Date(Number(timestamp));
+return d.toLocaleString('ru-RU', {
+day: '2-digit', month: '2-digit', year: 'numeric',
+hour: '2-digit', minute: '2-digit'
+});
+}
+async function loadAds() {
+refreshAdsBtn.disabled = true;
+refreshAdsBtn.textContent = '⏳ Обновляем...';
+const { data, error } = await db.from('ads').select('*').order('updated_at', { ascending: false });
+if (error) {
+console.error(error);
+ads = [];
+} else {
+ads = data || [];
+}
 renderAds();
+refreshAdsBtn.disabled = false;
+refreshAdsBtn.textContent = '🔄 Обновить объявления';
+}
+refreshAdsBtn.addEventListener('click', loadAds);
+adForm.addEventListener('submit', async (e) => {
+e.preventDefault();
+if (!myProfile) return;
+const editId = document.getElementById('edit-ad-id').value;
+const now = Date.now();
+const adPayload = {
+title: document.getElementById('ad-title').value.trim(),
+location: document.getElementById('ad-location').value.trim(),
+text: document.getElementById('ad-text').value.trim(),
+isPaid: document.getElementById('is-paid').checked,
+isFree: document.getElementById('is-free').checked,
+updated_at: now
+};
+if (editId) {
+const { error } = await db.from('ads').update(adPayload).eq('id', editId);
+if (error) {
+alert('Ошибка при обновлении: ' + error.message);
+return;
+}
+cancelEdit();
+} else {
+const newAd = {
+...adPayload,
+author: myProfile.name,
+author_username: myProfile.username,
+author_email: myProfile.email,
+avatar: myProfile.avatar || '',
+rating: myProfile.rating || 0,
+likes: 0,
+comments: []
+};
+const { error } = await db.from('ads').insert([newAd]);
+if (error) {
+alert('Ошибка публикации: ' + error.message);
+return;
+}
+adForm.reset();
+document.getElementById('ad-location').value = myProfile.location || '';
+}
+loadAds();
+});
+function startEditAd(id) {
+const ad = ads.find(item => String(item.id) === String(id));
+if (!ad) return;
+document.getElementById('edit-ad-id').value = ad.id;
+document.getElementById('ad-location').value = ad.location || '';
+document.getElementById('ad-title').value = ad.title;
+document.getElementById('ad-text').value = ad.text;
+document.getElementById('is-paid').checked = ad.isPaid;
+document.getElementById('is-free').checked = ad.isFree;
+document.getElementById('editor-title').textContent = '✏️ Редактирование объявления (поднимется вверх)';
+document.getElementById('ad-submit-btn').textContent = 'Сохранить и поднять вверх';
+document.getElementById('cancel-edit-btn').classList.remove('hidden');
+window.scrollTo(0, 0);
+}
+function cancelEdit() {
+document.getElementById('edit-ad-id').value = '';
+adForm.reset();
+if (myProfile) document.getElementById('ad-location').value = myProfile.location || '';
+document.getElementById('editor-title').textContent = 'Разместить новое объявление';
+document.getElementById('ad-submit-btn').textContent = 'Опубликовать объявление';
+document.getElementById('cancel-edit-btn').classList.add('hidden');
+}
+async function deleteAd(id) {
+if (confirm('Удалить это объявление?')) {
+await db.from('ads').delete().eq('id', id);
+loadAds();
+}
+}
+async function toggleLike(id) {
+const ad = ads.find(item => String(item.id) === String(id));
+if (!ad) return;
+ad.likes = (ad.likes || 0) + 1;
+renderAds();
+await db.from('ads').update({ likes: ad.likes }).eq('id', ad.id);
+}
+async function addComment(event, id) {
+event.preventDefault();
+const input = event.target.querySelector('input');
+const text = input.value.trim();
+if (!text) return;
+const ad = ads.find(item => String(item.id) === String(id));
+if (!ad) return;
+const authorLabel = myProfile ? ${myProfile.name} (@${myProfile.username}) : 'Участник';
+const updatedComments = [...(ad.comments || []), { author: authorLabel, text }];
+ad.comments = updatedComments;
+renderAds();
+await db.from('ads').update({ comments: updatedComments }).eq('id', ad.id);
+}
+function renderAds() {
+adsList.innerHTML = '';
+const now = Date.now();
+const filteredAds = ads.filter(ad => {
+const matchesPay =
+currentPayFilter === 'all' ||
+(currentPayFilter === 'paid' && ad.isPaid) ||
+(currentPayFilter === 'free' && ad.isFree);
+let matchesDate = true;
+if (currentDaysFilter !== 'all' && ad.updated_at) {
+const diffDays = (now - Number(ad.updated_at)) / (1000 * 60 * 60 * 24);
+matchesDate = diffDays <= Number(currentDaysFilter);
+}
+const q = searchQuery.toLowerCase();
+const matchesSearch =
+ad.title.toLowerCase().includes(q) ||
+ad.text.toLowerCase().includes(q) ||
+ad.author.toLowerCase().includes(q);
+const lq = locationFilterQuery.toLowerCase();
+const matchesLocation = !lq || (ad.location && ad.location.toLowerCase().includes(lq));
+return matchesPay && matchesDate && matchesSearch && matchesLocation;
+});
+if (filteredAds.length === 0) {
+adsList.innerHTML = 'По выбранным фильтрам объявлений пока нет.';
+return;
+}
+filteredAds.forEach(ad => {
+let badgesHTML = '';
+if (ad.isPaid) badgesHTML += '💰 Платно';
+if (ad.isFree) badgesHTML += '🆓 Бесплатно';
+const avatarHTML = ad.avatar
+? <img src="${ad.avatar}" alt="${ad.author}" class="avatar-mini">
+: <div class="avatar-mini placeholder">${ad.author.charAt(0).toUpperCase()}</div>;
+const starsHTML = renderStarsHTML(ad.rating);
+const isAuthor = myProfile && ad.author_email === myProfile.email;
+const ownerControlsHTML = isAuthor ? <div class="ad-actions"> <button type="button" class="btn-edit" onclick="startEditAd('${ad.id}')">✏️ Редактировать</button> <button type="button" class="btn-delete" onclick="deleteAd('${ad.id}')">🗑 Удалить</button> </div> : '';
+const commentsListHTML = (ad.comments || []).map(c =>
+<div class="comment-item"><strong>${c.author}:</strong> ${c.text}</div>
+).join('');
+const article = document.createElement('article');
+article.innerHTML = `
+
+
+${avatarHTML}
+
+${ad.author} (@${ad.author_username || 'user'})
+${starsHTML}
+
+
+
+🕒 ${formatDate(ad.updated_at)}
+${ownerControlsHTML}
+
+📍 ${ad.location || 'Местоположение не указано'}
+${ad.title}
+${ad.text}
+${badgesHTML}
+❤️ Нравится (${ad.likes || 0})
+${commentsListHTML || 'Комментариев пока нет'}
+
+
+Отправить
+
+
+`;
+adsList.appendChild(article);
+});
+}
+// Обработчики фильтров
+document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+btn.addEventListener('click', function() {
+document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
+this.classList.add('active');
+currentPayFilter = this.dataset.filter;
+renderAds();
+});
+});
+document.querySelectorAll('.date-btn').forEach(btn => {
+btn.addEventListener('click', function() {
+document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+this.classList.add('active');
+currentDaysFilter = this.dataset.days;
+renderAds();
+});
+});
+myCityBtn.addEventListener('click', () => {
+if (!myProfile || !myProfile.location) return;
+isMyCityOnly = !isMyCityOnly;
+if (isMyCityOnly) {
+myCityBtn.classList.add('active');
+const mainCity = myProfile.location.split(',')[0].trim();
+document.getElementById('location-filter-input').value = mainCity;
+locationFilterQuery = mainCity;
+} else {
+myCityBtn.classList.remove('active');
+document.getElementById('location-filter-input').value = '';
+locationFilterQuery = '';
+}
+renderAds();
+});
+document.getElementById('search-input').addEventListener('input', function() {
+searchQuery = this.value.trim();
+renderAds();
+});
+document.getElementById('location-filter-input').addEventListener('input', function() {
+locationFilterQuery = this.value.trim();
+if (isMyCityOnly) {
+isMyCityOnly = false;
+myCityBtn.classList.remove('active');
+}
+renderAds();
+});
