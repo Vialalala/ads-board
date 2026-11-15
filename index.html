@@ -36,8 +36,8 @@
                 <button type="submit" class="btn-full">Войти</button>
             </form>
             <div class="auth-footer-links">
-                <a href="#" onclick="event.preventDefault(); showView('view-register')">Нет аккаунта? Регистрация</a>
-                <a href="#" onclick="event.preventDefault(); showView('view-reset')">Забыл пароль</a>
+                <a href="#reg" onclick="event.preventDefault(); showView('view-register')">Нет аккаунта? Регистрация</a>
+                <a href="#res" onclick="event.preventDefault(); showView('view-reset')">Забыл пароль</a>
             </div>
         </section>
     </div>
@@ -186,7 +186,7 @@
                     <p id="page-location" class="location-tag">📍 Населённый пункт</p>
                     <div id="page-rating" class="rating-display"></div>
 
-                    <!-- Кнопки быстрой связи через Telegram и WhatsApp -->
+
 ✈️ Написать в Telegram
 💬 Написать в WhatsApp
 Оцените участника:
@@ -216,6 +216,13 @@
 
 Комментарии к объявлениям участника
 
-
----
-
+function showView(viewId) {
+document.querySelectorAll('.view-screen').forEach(function(el) {
+el.classList.add('hidden');
+});
+var target = document.getElementById(viewId);
+if (target) {
+target.classList.remove('hidden');
+}
+window.scrollTo(0, 0);
+}

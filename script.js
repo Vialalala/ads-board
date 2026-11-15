@@ -29,13 +29,6 @@ const myCityBtn = document.getElementById('my-city-btn');
 // ==========================================
 // 1. НАВИГАЦИЯ И ОТРИСОВКА 5 ЗВЁЗД РЕЙТИНГА
 // ==========================================
-function showView(viewId) {
-    document.querySelectorAll('.view-screen').forEach(el => el.classList.add('hidden'));
-    const target = document.getElementById(viewId);
-    if (target) target.classList.remove('hidden');
-    window.scrollTo(0, 0);
-}
-
 function openFeed() {
     showView('view-feed');
     loadAds();
@@ -83,9 +76,10 @@ async function loadOrCreateMyProfile(user) {
         myProfile = data;
     } else {
         const meta = user.user_metadata || {};
+        const emailPrefix = user.email.split('@').at(0);
         const newProfile = {
             email: user.email,
-            username: meta.username || user.email.split('@'),
+            username: meta.username || emailPrefix,
             name: meta.name || 'Родитель',
             location: meta.location || 'Россия',
             bio: '',
@@ -120,7 +114,8 @@ function updateNavbarProfile() {
     }
 
     document.getElementById('ad-location').value = myProfile.location || '';
-    const shortCity = (myProfile.location || '').split(',').trim();
+    const cityParts = (myProfile.location || '').split(',');
+    const shortCity = (cityParts.at(0) || '').trim();
     myCityBtn.textContent = shortCity ? `📍 Мой город (${shortCity})` : '📍 Мой населённый пункт';
 }
 
@@ -267,7 +262,7 @@ async function openUserProfile(username) {
     const isOwn = myProfile && profile.email === myProfile.email;
 
     document.getElementById('page-name').textContent = profile.name;
-document.getElementById('page-username').textContent = '@' + profile.username;
+    document.getElementById('page-username').textContent = '@' + profile.username;
 document.getElementById('page-location').textContent = '📍 ' + (profile.location || 'Населённый пункт не указан');
 const votesCount = Object.keys(profile.ratings_map || {}).length;
 document.getElementById('page-rating').innerHTML = renderStarsHTML(profile.rating, votesCount);
@@ -422,7 +417,7 @@ openOwnProfile();
 alert('Данные профиля и контакты для связи сохранены!');
 });
 document.getElementById('avatar-upload').addEventListener('change', function(e) {
-const file = e.target.files;
+const file = e.target.files ? e.target.files.item(0) : null;
 if (!file || !myProfile) return;
 const reader = new FileReader();
 reader.onload = function(event) {
@@ -692,7 +687,8 @@ if (!myProfile || !myProfile.location) return;
 isMyCityOnly = !isMyCityOnly;
 if (isMyCityOnly) {
 myCityBtn.classList.add('active');
-const mainCity = myProfile.location.split(',').trim();
+const cityParts = myProfile.location.split(',');
+const mainCity = (cityParts.at(0) || '').trim();
 document.getElementById('location-filter-input').value = mainCity;
 locationFilterQuery = mainCity;
 } else {
