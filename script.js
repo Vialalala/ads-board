@@ -131,29 +131,34 @@ if (regLocationInput) {
 
         locationTimeout = setTimeout(async () => {
             try {
-                const url = `https://openstreetmap.org{encodeURIComponent(query)}&countrycodes=ru&format=json&addressdetails=1&limit=10&accept-language=ru`;
+                // Используем быстрый геокодер Photon с фильтром по России
+                const url = `https://komoot.io{encodeURIComponent(query)}&lang=ru&limit=15`;
                 const res = await fetch(url);
-                const places = await res.json();
+                const data = await res.json();
                 locationSuggestions.innerHTML = '';
 
-                const settlements = places.filter(p => 
-                    p.address && (p.address.city || p.address.town || p.address.village || p.address.hamlet || p.address.suburb)
-                );
-
-                if (settlements.length === 0) {
+                if (!data.features || data.features.length === 0) {
                     locationSuggestions.classList.add('hidden');
                     return;
                 }
 
                 const unique = new Set();
-                settlements.forEach(place => {
-                    const addr = place.address;
-                    const loc = addr.city || addr.town || addr.village || addr.hamlet || addr.suburb;
-                    const dist = addr.county || addr.district || '';
-                    const reg = addr.state || addr.region || '';
-                    const fullName = [...new Set([loc, dist, reg].filter(Boolean))].join(', ');
+                data.features.forEach(feature => {
+                    const props = feature.properties;
+                    // Оставляем только населённые пункты России
+                    if (props.countrycode !== 'RU') return;
+                    
+                    const validTypes = ['city', 'town', 'village', 'hamlet', 'suburb', 'locality'];
+                    if (!validTypes.includes(props.osm_value) && !props.city) return;
 
-                    if (!unique.has(fullName)) {
+                    const locality = props.name || props.city;
+                    const district = props.county || props.district || '';
+                    const region = props.state || '';
+
+                    const parts = [locality, district, region].filter(Boolean);
+                    const fullName = [...new Set(parts)].join(', ');
+
+                    if (fullName && !unique.has(fullName)) {
                         unique.add(fullName);
                         const li = document.createElement('li');
                         li.textContent = fullName;
@@ -164,11 +169,16 @@ if (regLocationInput) {
                         locationSuggestions.appendChild(li);
                     }
                 });
-                locationSuggestions.classList.remove('hidden');
+
+                if (unique.size > 0) {
+                    locationSuggestions.classList.remove('hidden');
+                } else {
+                    locationSuggestions.classList.add('hidden');
+                }
             } catch (err) {
-                console.error(err);
+                console.error('Ошибка поиска города:', err);
             }
-        }, 400);
+        }, 300);
     });
 }
 
@@ -195,12 +205,11 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
         }
     });
 
-    if (error) {
+     if (error) {
         alert('Ошибка регистрации: ' + error.message);
     } else {
-        alert('Письмо со ссылкой отправлено на ' + email + '. Перейдите по ссылке в письме для подтверждения и входа!');
+        alert('Регистрация прошла успешно! Добро пожаловать в сервис «Няня рядом».');
         e.target.reset();
-        showView('view-login');
     }
 });
 
